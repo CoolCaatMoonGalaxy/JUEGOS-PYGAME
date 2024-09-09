@@ -1,9 +1,23 @@
 import pygame
+import constantes
 
 class Personaje:
     def __init__(self, x, y):
-        self.shape = pygame.Rect(0, 0, 20, 20)
-        self.shape.center = (x, y)
+        # Cargar la textura
+        self.textura = pygame.image.load('assets/square.png').convert_alpha()
+
+        # Ajustar el tamaño de la textura al tamaño del personaje cuadrado
+        self.textura = pygame.transform.scale(self.textura, (constantes.ANCHO_PERSONAJE, constantes.ALTO_PERSONAJE))
+
+        # Crear el rectángulo para la textura
+        self.rect = self.textura.get_rect()
+        self.rect.center = (x, y)
+
+    def movimiento(self, delta_x, delta_y):
+        # Actualiza la posición del jugador
+        self.rect.x += delta_x
+        self.rect.y += delta_y
 
     def dibujar(self, interfaz):
-        pygame.draw.rect(interfaz, (255, 255, 0), self.shape)
+        # Dibujar la textura en la interfaz
+        interfaz.blit(self.textura, self.rect)
