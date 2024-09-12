@@ -1,6 +1,7 @@
 import pygame
+from enemies import Enemie
 import constantes
-from personaje import Personaje, Enemigo
+from personaje import Personaje
 from PIL import Image
 import extra_anim
 
@@ -13,8 +14,30 @@ ventana = pygame.display.set_mode((constantes.ANCHO_ventana, constantes.ALTO_ven
 # Título de la ventana
 pygame.display.set_caption("Pygame Proyecto")
 
+# Hacemos un sprite grupo para las colisiones del enemigo
+grupo_enemigos = pygame.sprite.Group()
+
+# Creamos la función que agrega a los enemigos al grupo
+def crear_enemigos(cantidad_enemigos):
+    enemigos_creados = []
+    for i in range(cantidad_enemigos):
+        enemigo = Enemie(100 + i * 50, 80 + i * 30, enem_sprites_idle, enem_sprites_walk, enem_sprites_attack,extra_anim.orc_death_anim, energia_enemie=100)
+        grupo_enemigos.add(enemigo)  # Agregamos el enemigo al grupo de colisiones
+        enemigos_creados.append(enemigo) 
+    return len(enemigos_creados)  # Devolvemos el número de enemigos creados
+    
+
+# Creamos la función para escalar la imagen (solo escalar una vez)
+def escalar_img(image, scale):
+    if scale <= 0:
+        raise ValueError("El factor de escala debe ser mayor que 0")
+    w = image.get_width()
+    h = image.get_height()
+    nueva_imagen = pygame.transform.scale(image, (int(w * scale), int(h * scale)))
+    return nueva_imagen
+
 # Función para cargar frames de un GIF usando Pillow
-def cargar_gif(ruta_gif):
+def cargar_gif(ruta_gif, escala):
     imagen_gif = Image.open(ruta_gif)
     frames = []
     try:
@@ -22,7 +45,7 @@ def cargar_gif(ruta_gif):
             frame = imagen_gif.copy()
             frame = frame.convert("RGBA")
             frame_pygame = pygame.image.fromstring(frame.tobytes(), frame.size, frame.mode)
-            frame_pygame = pygame.transform.scale(frame_pygame, (constantes.ANCHO_PERSONAJE, constantes.ALTO_PERSONAJE))
+            frame_pygame = escalar_img(frame_pygame, escala)  # Escalar una vez
             frames.append(frame_pygame)
             imagen_gif.seek(imagen_gif.tell() + 1)
     except EOFError:
@@ -32,32 +55,27 @@ def cargar_gif(ruta_gif):
     return frames
 
 # Cargamos las animaciones del personaje
-animaciones_caminando = cargar_gif('assets/character/KNIGHT/run.gif')
-animaciones_idle = cargar_gif('assets/character/KNIGHT/idle.gif')
-animaciones_agachar = cargar_gif('assets/character/KNIGHT/crouch.gif')
-animaciones_salto = cargar_gif('assets/character/KNIGHT/Jump.gif')
-animaciones_caer = cargar_gif('assets/character/KNIGHT/JumpFallInbetween.gif')
+animaciones_caminando = cargar_gif('assets/character/KNIGHT/run.gif', constantes.SCALE_CHAR)
+animaciones_idle = cargar_gif('assets/character/KNIGHT/idle.gif', constantes.SCALE_CHAR)
+animaciones_agachar = cargar_gif('assets/character/KNIGHT/crouch.gif', constantes.SCALE_CHAR)
 
-# Cargamos las animaciones del enemigo
-animaciones_enemigo_walk = cargar_gif('assets/character/enemies/Demon/walk.gif')
-animaciones_enemigo_idle = cargar_gif('assets/character/enemies/Demon/idle.gif')
-animaciones_enemigo_attack = cargar_gif('assets/character/enemies/Demon/attack.gif')
+# Cargamos los sprites del enemigo
+enem_sprites_idle = [escalar_img(pygame.image.load(f'assets/enemies/ORC/idle/Orc-Idle_{i}.png'), constantes.SCALE_CHAR) for i in range(6)]
+enem_sprites_walk = [escalar_img(pygame.image.load(f'assets/enemies/ORC/walk/images/Orc-walk_{i}.png'), constantes.SCALE_CHAR) for i in range(8)]
+enem_sprites_attack = [escalar_img(pygame.image.load(f'assets/enemies/ORC/attack/Orc-Attack_{i}.png'), constantes.SCALE_CHAR) for i in range(6)]
 
 # Definir variables de movimiento del jugador
 mover_izquierda = False
 mover_derecha = False
+mover_arriba = False
+mover_abajo = False
 agacharse = False
-saltar = False
 
 # Creamos el personaje con las animaciones
-jugador = Personaje(50, 50, animaciones_caminando, animaciones_idle, animaciones_agachar,
-                    animaciones_salto, animaciones_caer, extra_anim.animacion_ataque_estatico)
+jugador = Personaje(50, 50, animaciones_caminando, animaciones_idle, animaciones_agachar, extra_anim.animacion_ataque_estatico, energia=100, escala=1)
 
-# Creamos el enemigo con las animaciones
-demon = Enemigo(100, 0, animaciones_enemigo_walk, animaciones_enemigo_idle, [],  # Si no hay animación de agacharse para el enemigo
-                [],  # Si no hay animación de salto para el enemigo
-                [],  # Si no hay animación de caer para el enemigo
-                animaciones_enemigo_attack, animaciones_enemigo_walk)  # Usa las animaciones específicas para enemigos
+# En esta parte llamamos a la función para crear enemigos y agregamos la cantidad al grupo (en este caso, 3)
+cantidad_enemigos = crear_enemigos(3)
 
 # Variable de control para mantener la ventana abierta
 run = True
@@ -66,10 +84,12 @@ run = True
 clock = pygame.time.Clock()
 
 # Bucle principal
+# Bucle principal
 while run:
     delta_x = 0
+    delta_y = 0
 
-    # Manejamos los eventos
+    # Manejo de eventos
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             run = False
@@ -80,45 +100,59 @@ while run:
                 mover_izquierda = True
             elif event.key == pygame.K_d:
                 mover_derecha = True
+            elif event.key == pygame.K_w:
+                mover_arriba = True
+            elif event.key == pygame.K_s:
+                mover_abajo = True
             elif event.key == pygame.K_LSHIFT:
                 agacharse = True
-            elif event.key == pygame.K_SPACE:  # Espacio para saltar
-                saltar = True
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_a:
                 mover_izquierda = False
             elif event.key == pygame.K_d:
                 mover_derecha = False
+            elif event.key == pygame.K_w:
+                mover_arriba = False
+            elif event.key == pygame.K_s:
+                mover_abajo = False
             elif event.key == pygame.K_LSHIFT:
                 agacharse = False
-            elif event.key == pygame.K_SPACE:
-                saltar = False
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:  # 1 es el botón izquierdo del ratón
                 jugador.ataque()  # Llamada al método de ataque
 
-    # Verifica los movimientos horizontales
+    # Actualizar movimiento del jugador
     if mover_derecha:
         delta_x = constantes.velocidad_move
     elif mover_izquierda:
         delta_x = -constantes.velocidad_move
 
-    # Actualiza la posición del personaje
-    jugador.movimiento(delta_x, agacharse, saltar)
-    demon.movimiento(0, False, False)  # Ajusta el movimiento del enemigo según tu lógica
+    if mover_arriba:
+        delta_y = -constantes.velocidad_move
+    elif mover_abajo:
+        delta_y = constantes.velocidad_move
 
-    # Limpiamos la pantalla
+    jugador.movimiento(delta_x, delta_y, agacharse)
+
+    # Actualizar los enemigos
+    for enemigo in grupo_enemigos:
+        enemigo.actualizar(jugador)
+
+    # Verificar colisión y ataque
+    for enemigo in grupo_enemigos:
+        if pygame.sprite.collide_rect(jugador, enemigo) and jugador.ataque_activo:  # Usar un flag de ataque
+            enemigo.energia_enemie -= 2  # Reducir la energía del enemigo al colisionar
+
+            print("¡Colisión durante ataque! Energía del enemigo reducida.")
+            print(f'{enemigo.energia_enemie}')
+
+    # Renderizar
     ventana.fill(constantes.COLOR_BACKGROUND)
-
-    # Dibujamos al personaje y al enemigo
     jugador.dibujar(ventana)
-    demon.dibujar(ventana)
+    grupo_enemigos.draw(ventana)
 
-    # Actualizamos la pantalla
+    # Actualizar pantalla y control de frames
     pygame.display.update()
-
-    # Controlamos el frame rate (FPS)
     clock.tick(constantes.FPS)
 
-# Salimos correctamente de Pygame
 pygame.quit()
